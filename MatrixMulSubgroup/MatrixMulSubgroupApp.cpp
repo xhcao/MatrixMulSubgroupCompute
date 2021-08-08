@@ -9,6 +9,7 @@ using namespace DirectX::PackedVector;
 
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "D3D12.lib")
+#pragma comment(lib, "dxcompiler.lib")
 
 const int gNumFrameResources = 3;
 
@@ -51,7 +52,7 @@ private:
 	std::unordered_map<std::string, std::unique_ptr<MeshGeometry>> mGeometries;
 	std::unordered_map<std::string, std::unique_ptr<Material>> mMaterials;
 	std::unordered_map<std::string, std::unique_ptr<Texture>> mTextures;
-	std::unordered_map<std::string, ComPtr<ID3DBlob>> mShaders;
+	std::unordered_map<std::string, ComPtr<IDxcBlob>> mShaders;
 	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> mPSOs;
 
 	std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout;
@@ -191,7 +192,7 @@ void VecAddComputeApp::DoComputeWork()
 	mCommandList->SetComputeRootShaderResourceView(1, mInputBufferB->GetGPUVirtualAddress());
 	mCommandList->SetComputeRootUnorderedAccessView(2, mOutputBuffer->GetGPUVirtualAddress());
 
-	mCommandList->Dispatch(1, 1, 1);
+	mCommandList->Dispatch((N - 1) / 16 + 1, M, 1);
 
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mOutputBuffer.Get(),
 		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE));
@@ -316,7 +317,7 @@ void VecAddComputeApp::BuildDescriptorHeaps()
 
 void VecAddComputeApp::BuildShadersAndInputLayout()
 {
-	mShaders["vecAddCS"] = d3dUtil::CompileShader(L"MatrixMulSubgroup.hlsl", nullptr, "CS", "cs_5_0");
+	mShaders["matrixmulCS"] = d3dUtil::DXCCompileShader(L"matrixmulsubgroupfloat.hlsl", nullptr, "main", "cs_6_0");
 }
 
 void VecAddComputeApp::BuildPSOs()
@@ -325,11 +326,12 @@ void VecAddComputeApp::BuildPSOs()
 	computePsoDesc.pRootSignature = mRootSignature.Get();
 	computePsoDesc.CS =
 	{
-		reinterpret_cast<BYTE*>(mShaders["vecAddCS"]->GetBufferPointer()),
-		mShaders["vecAddCS"]->GetBufferSize()
+		reinterpret_cast<BYTE*>(mShaders["matrixmulCS"]->GetBufferPointer()),
+		mShaders["matrixmulCS"]->GetBufferSize()
 	};
 	computePsoDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
-	ThrowIfFailed(md3dDevice->CreateComputePipelineState(&computePsoDesc, IID_PPV_ARGS(&mPSOs["vecAdd"])));
+	HRESULT hr = md3dDevice->CreateComputePipelineState(&computePsoDesc, IID_PPV_ARGS(&mPSOs["vecAdd"]));
+	ThrowIfFailed(hr);
 }
 
 void VecAddComputeApp::BuildFrameResources()

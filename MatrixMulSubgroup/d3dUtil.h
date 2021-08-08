@@ -21,6 +21,7 @@
 #include <cassert>
 #include "d3dx12.h"
 #include "MathHelper.h"
+#include <dxcapi.h>
 
 extern const int gNumFrameResources;
 
@@ -115,6 +116,12 @@ public:
         Microsoft::WRL::ComPtr<ID3D12Resource>& uploadBuffer);
 
     static Microsoft::WRL::ComPtr<ID3DBlob> CompileShader(
+        const std::wstring& filename,
+        const D3D_SHADER_MACRO* defines,
+        const std::string& entrypoint,
+        const std::string& target);
+
+    static Microsoft::WRL::ComPtr<IDxcBlob> DXCCompileShader(
         const std::wstring& filename,
         const D3D_SHADER_MACRO* defines,
         const std::string& entrypoint,

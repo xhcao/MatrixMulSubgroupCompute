@@ -112,12 +112,63 @@ ComPtr<ID3DBlob> d3dUtil::CompileShader(
     hr = D3DCompileFromFile(filename.c_str(), defines, D3D_COMPILE_STANDARD_FILE_INCLUDE,
         entrypoint.c_str(), target.c_str(), compileFlags, 0, &byteCode, &errors);
 
-    if (errors != nullptr)
-        OutputDebugStringA((char*)errors->GetBufferPointer());
+    if (errors != nullptr) {
+        char* err = (char*)errors->GetBufferPointer();
+        OutputDebugStringA(err);
+    }
 
     ThrowIfFailed(hr);
 
     return byteCode;
+}
+
+ComPtr<IDxcBlob> d3dUtil::DXCCompileShader(
+    const std::wstring& filename,
+    const D3D_SHADER_MACRO* defines,
+    const std::string& entrypoint,
+    const std::string& target)
+{
+    ComPtr<IDxcLibrary> library;
+    HRESULT hr = DxcCreateInstance(CLSID_DxcLibrary, IID_PPV_ARGS(&library));
+
+    ComPtr<IDxcCompiler> compiler;
+    hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler));
+
+    uint32_t codePage = CP_UTF8;
+    ComPtr<IDxcBlobEncoding> sourceBlob;
+    hr = library->CreateBlobFromFile(L"matrixmulsubgroupfloat.hlsl", &codePage, &sourceBlob);
+    //if(FAILED(hr)) Handle file loading error...
+
+    ComPtr<IDxcOperationResult> result;
+    hr = compiler->Compile(
+        sourceBlob.Get(), // pSource
+        nullptr, // pSourceName
+        L"main", // pEntryPoint
+        L"cs_6_0", // pTargetProfile
+        NULL, 0, // pArguments, argCount
+        NULL, 0, // pDefines, defineCount
+        NULL, // pIncludeHandler
+        &result); // ppResult
+    if (SUCCEEDED(hr))
+        result->GetStatus(&hr);
+    if (FAILED(hr))
+    {
+        if (result)
+        {
+            ComPtr<IDxcBlobEncoding> errorsBlob;
+            hr = result->GetErrorBuffer(&errorsBlob);
+            if (SUCCEEDED(hr) && errorsBlob)
+            {
+                const char* errStr = (const char*)errorsBlob->GetBufferPointer();
+                wprintf(L"Compilation failed with errors:\n%hs\n", errStr);
+            } 
+        }
+        // Handle compilation error...
+    }
+    ComPtr<IDxcBlob> code;
+    result->GetResult(&code);
+
+    return std::move(code);
 }
 
 std::wstring DxException::ToString()const
